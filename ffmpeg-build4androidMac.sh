@@ -1,87 +1,67 @@
-# ffmpeg-build4androidMac.sh
-# set project dir of FFMPEG
-export PROJECT_DIR_FFMPEG=/Users/AlphaGo/ffempeg-develop/FFempegForAndroid/FFmpeg
-export NDK=/Users/AlphaGo/development/android-ndk-r14b
-export PREFIX=/Users/AlphaGo/Desktop/FFmpegLib
+#!/bin/bash
+#配置ndk的路径
+NDK=/Users/AlphaGo/development/android-ndk-r14b
+#指定Android版本指定架构的so库和头文件
+PLATFORM=$NDK/platforms/android-21/arch-arm
+TOOLCHAIN=$NDK/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64
+CPU=armv7-a
+#输出路径
+PREFIX=./android/$CPU
+function build_ffmpeg
+{
+    echo "开始编译ffmpeg"
+    ./configure \
+    --prefix=$PREFIX \
+    --target-os=android \
+    --cross-prefix=$TOOLCHAIN/bin/arm-linux-androideabi- \
+    --arch=arm \
+    --cpu=$CPU  \
+    --sysroot=$PLATFORM \
+    --extra-cflags="$CFLAG" \
+    --cc=$TOOLCHAIN/bin/arm-linux-androideabi-gcc \
+    --nm=$TOOLCHAIN/bin/arm-linux-androideabi-nm \
+    --disable-shared \
+    --enable-static \
+    --enable-runtime-cpudetect \
+    --enable-gpl \
+    --enable-small \
+    --enable-cross-compile \
+    --disable-debug \
+    --disable-doc \
+    --disable-ffmpeg \
+    --disable-ffplay \
+    --disable-ffprobe \
+    --disable-ffserver \
+    --disable-postproc \
+    --disable-avdevice \
+    --disable-symver \
+    --disable-stripping \
+    $ADD 
+    make -j16
+    make install
+    echo "编译结束！"
+}
 
-if [ ! $PROJECT_DIR_FFMPEG ]; then
-    echo "FFMPEG is EMPTY"
-    exit -1
-fi
+echo "编译不支持neon和硬解码"
+CPU=armv7-a
+PREFIX=./androidV2/$CPU
+CFLAG="-I$PLATFORM/usr/include -fPIC -DANDROID -mfpu=vfp -mfloat-abi=softfp "
+ADD=
+build_ffmpeg
 
-if [ ! $NDK ]; then
-    echo "NDK is EMPTY"
-    exit -1
-fi
-
-if [ ! $PREFIX ]; then
-    PREFIX=~/
-fi
-
-export PREBUILT=$NDK/toolchains/arm-linux-androideabi-4.9/prebuilt
-export PLATFORM=$NDK/platforms/android-14/arch-arm
-
-# open ffmpeg dir
-cd $PROJECT_DIR_FFMPEG
-
-echo "Start Compile FFMPEG"
-
-CPU=arm
-ARCH=arm
-#-marm -mthumb gcc编译器参数
-#marm性能优于mthumb百分之10到15，mthumb兼容性更好，可以调试用marm，发版用mthumb
-ADDI_CFLAGS="-marm"
-./configure \
---prefix=$PREFIX \
---target-os=linux \
---arch=$ARCH \
---sysroot=$PLATFORM \
---cross-prefix=$PREBUILT/darwin-x86_64/bin/arm-linux-androideabi- \
---extra-ldflags="$ADDI_LDFLAGS" \
---extra-cflags="-Os -fpic $ADDI_CFLAGS" \
---enable-small \
---enable-gpl \
---enable-pthreads \
---disable-doc \
---disable-ffmpeg \
---disable-ffplay \
---disable-ffprobe \
---disable-doc \
---disable-network \
---disable-shared \
---disable-encoders \
---disable-decoders \
---enable-protocols \
---enable-filters \
---enable-decoder=mpeg4 \
---enable-decoder=h264 \
---enable-decoder=mp3 \
---enable-decoder=aac \
---enable-encoder=mpeg4 \
---enable-encoder=libx264 \
---enable-encoder=aac \
-$ADDITIONAL_CONFIGURE_FLAG
-make clean
-make -j4
-make install
-$PREBUILT/darwin-x86_64/bin/arm-linux-androideabi-ld \
--rpath-link=$PLATFORM/usr/lib \
--L$PLATFORM/usr/lib \
--L$PREFIX/lib \
--soname libffmpeg.so -shared -nostdlib -Bsymbolic --whole-archive --no-undefined -o \
-$PREFIX/libffmpeg.so \
-libavcodec/libavcodec.a \
-libavformat/libavformat.a \
-libavutil/libavutil.a \
-libavfilter/libavfilter.a \
-libavdevice/libavdevice.a \
-libpostproc/libpostproc.a \
-libswresample/libswresample.a \
-libswscale/libswscale.a \
--lc -lm -lz -ldl -llog --dynamic-linker=/system/bin/ \
-$PREBUILT/darwin-x86_64/lib/gcc/arm-linux-androideabi/4.9.x/libgcc.a
-$PREBUILT/darwin-x86_64/bin/arm-linux-androideabi-strip $PREFIX/libffmpeg.so
-
-
-
-
+# 将静态库链接成一个动态库
+BIN_PREFIX=arm-linux-androideabi
+$TOOLCHAIN/bin/${BIN_PREFIX}-ld \
+      -rpath-link=$PLATFORM/usr/lib \
+      -L$PLATFORM/usr/lib \
+      -L$PREFIX/lib \
+      -soname libffmpeg.so -shared -nostdlib -Bsymbolic --whole-archive --no-undefined -o \
+      $PREFIX/libffmpeg.so \
+      $PREFIX/lib/libavcodec.a \
+      $PREFIX/lib/libavfilter.a \
+      $PREFIX/lib/libavformat.a \
+      $PREFIX/lib/libavutil.a \
+      $PREFIX/lib/libswresample.a \
+      $PREFIX/lib/libswscale.a \
+      -lc -lm -lz -ldl -llog \
+      $TOOLCHAIN/lib/gcc/${BIN_PREFIX}/4.9.x/libgcc.a
